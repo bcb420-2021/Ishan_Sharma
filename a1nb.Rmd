@@ -1,0 +1,245 @@
+---
+title: "A1"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+Install required packages. 
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+if (!requireNamespace("GEOmetadb", quietly = TRUE))
+    BiocManager::install("GEOmetadb")
+```
+The GEO database contains dataset on gene expressions but can be tough to navigate online. It is better to use the GEOmetadb package and sort through the metadata using SQLite queries to design the experiment.
+```{r}
+library(knitr)
+library(GEOmetadb)
+if(!file.exists('GEOmetadb.sqlite')) getSQLiteFile()
+```
+Getting some information about file and its contents: 
+```{r}
+file.info('GEOmetadb.sqlite')
+```
+
+
+```{r}
+con <- dbConnect(SQLite(),'GEOmetadb.sqlite')
+geo_tables <- dbListTables(con)
+geo_tables
+
+```
+
+
+
+
+DEFINING THE OBJECT INFO FUNCTION
+This code was adapted from lecture material and was primarily used to understand table data pulled from GEO during the course of this assignment.
+```{r}
+objectInfo <- function(x) {
+     # Function to combine various information items about R objects
+     #
+     # Input: an R object
+     # Value: none - prints information as side-effect
+ 
+     cat("object contents:")
+     print(x, digits = 22)  # print value at maximal precision
+ 
+     cat("\nstructure of object:\n")
+     str(x)
+ 
+     if (! is.list(x)) { # Don't use cat() if x is a list. cat() can't handle lists.
+         cat("\nmode:   ", mode(x), "\n")
+         cat("typeof: ", typeof(x), "\n")
+         cat("class:  ", class(x), "\n")
+     }
+ 
+     # if the object has attributes, print them too
+     if (! is.null(attributes(x))) {
+        cat("\nattributes:\n")
+         attributes(x)
+     }
+     # Done
+ }
+```
+
+Looking for RNAseq data sets according to a1 requirements.
+We know the tag high-throughput sequencing appeared in uniq tech, this is the word for RNAseq. Since I wanted to do bulk RNAseq analysis, I'll look for data that helps me do that with human tissues. The data is at recent! 
+
+```{r}
+sql <- paste("SELECT DISTINCT gse.title,gse.gse, gpl.title,",
+             " gse.submission_date,",
+             " gse.supplementary_file",
+             "FROM",
+             "  gse JOIN gse_gpl ON gse_gpl.gse=gse.gse",
+             "  JOIN gpl ON gse_gpl.gpl=gpl.gpl",
+             "WHERE",
+             "  gse.submission_date > '2011-01-01' AND",
+             "  gpl.organism LIKE '%Homo sapiens%' AND",
+             
+             "  gpl.technology LIKE '%high-throughput sequencing%' ",
+             "  ORDER BY gse.submission_date DESC",sep=" ")
+rs <- dbGetQuery(con,sql)
+# break the file names up and just get the actual file name
+unlist(lapply(rs$supplementary_file,
+              FUN = function(x){x <- unlist(strsplit(x,";")) ;
+              x <- x[grep(x,pattern="txt",ignore.case = TRUE)]; # we want a txt file
+                tail(unlist(strsplit(x,"/")),n=1)})) [1:10]
+rs <- dbGetQuery(con,sql)
+# we only want supp files which are counts
+counts_files <- rs$supplementary_file[grep(rs$supplementary_file,
+                              pattern = "count",ignore.case = TRUE)] 
+knitr::kable(counts_files, format = "html")
+
+# Silences the disconnect warning:
+dbDisconnect((con))
+```
+Get Information on The supplementary files with the chosen dataset. Make a separate directory in this one to access downloaded data. This function's extra parameters are relaly helpful to do all the fetching and organising of supplementary files from the dataset.
+```{r}
+supp_files =  getGEOSuppFiles('GSE154583', makeDirectory = TRUE, baseDir = getwd(),
+  fetch_files = TRUE)
+supp_files
+```
+```{r}
+
+
+counts_data = read.delim("GSE154583/GSE154583_counts_data.txt.gz",header=TRUE,
+             check.names = FALSE, stringsAsFactors = FALSE, sep = " ")
+#normal_counts_data = #read.delim("GSE154583/GSE154583_norm_counts_data.txt.gz",header=TRUE,
+ #            check.names = FALSE, sep = " ")
+# get a little more sense about how the data frame is structured
+objectInfo(counts_data)
+```
+
+```{r}
+library("edgeR")
+cpms = cpm(counts_data[, 1:8])
+rownames(cpms) <- counts_data[,1]
+# get rid of low counts
+donor1 = rowSums(cpms >1) >=8  # following the edgeR protocol
+counts_filtered = counts_data[donor1,]
+
+#dim(counts_filtered)
+#counts_filtered
+
+# 
+```
+FILTERING..
+There are 4 Donors- D1, D2, D3 AND D4 in the study and two blood cell types: 'naive' and 'MBC'. Three types of tissues were sampled - Spleen, ileum and blood tissues. Spleen has 4 biological replicates and ileum (gut) has 3. From a thorough reading of the experiment, I was able to form some groupings to start decoding what the column names refer to. Here are my findings: 
+All donors sampled for both naive and MBC blood type.
+All P samples are from D1 and all MN samples are from D2. 
+No P samples are of ileum or blood tissues.
+No MN sample is of blood tissue.
+NW 12-16, 20-27, 30 are of D3 and come from all three tissues.
+NW 17,18, 19, 29, 31, 33-35, 39-41 are of D4 and come from all three tissues
+
+For now I will choose to work with Donor1 spleen tissue sample and try to analyse the differences
+between naive cell and Memory B cell types. 
+
+```{r}
+
+samples <- data.frame()
+samples <-rbind(samples, data.frame(P1="naive", P2 = "naive", P3="naive", P4="naive", P5 = "MBC", P6="MBC", P7="MBC", P8="MBC"))
+colnames(samples) <- colnames(counts_data)[1:8]
+rownames(samples) <- c("cell_type")
+samples <- data.frame(t(samples))
+samples
+```
+
+
+Now that I have grouped the data, I'll do some cleaning. 
+```{r}
+filtered_data_matrix <- as.matrix(counts_filtered[,1:8])
+
+dgeList = DGEList(counts=filtered_data_matrix, group=samples$cell_type)
+dgeList
+
+```
+Calculate normalised factors in our DGE list. 
+
+```{r}
+dgeList = calcNormFactors(dgeList)
+normalized_counts <- cpm(dgeList)
+normalized_counts
+
+
+```
+
+Let's see how this lools like on a graph. Samples with similar gene expressions tend to cluster together. In the plot below, we can see samples with MBC typle blood cell clustering up, however there is still a good amount of variance in our samples.  
+ 
+```{r}
+plotMDS(dgeList, labels=rownames(samples),
+  col = c("darkgreen","blue")[factor(samples$cell_type)])
+
+```
+Calculating dispersion: I'm just using cell_type here for the model design so that edgeR can show us the variance of genes across samples.  
+```{r}
+model_design <- model.matrix(~samples$cell_type+0)
+dgeList <- estimateDisp(dgeList, model_design)
+dgeList
+```
+
+This is how the BCV graph looks like for the above dispersion. Note that genes with more counts will have smaller variations between samples than genes with few counts.
+
+```{r}
+plotBCV(dgeList,col.tagwise = "black",col.common = "red",)
+
+```
+
+
+
+We can also see the mean variance relationship for this sample:
+
+```{r}
+plotMeanVar(dgeList, show.raw.vars = TRUE, show.tagwise.vars=TRUE, 
+            show.ave.raw.vars = TRUE,  NBline=TRUE, 
+            show.binned.common.disp.vars = TRUE)
+
+```
+Mapping to HUGO symbols:
+The biomart package has functions to help us with identifier mapping, let's shortlist some functoons which will help us map the gene expressions to their HUGO symbols.
+```{r}
+library(biomaRt)
+ensembl_mart <- useMart("ensembl")
+
+ens_dataset = useDataset("hsapiens_gene_ensembl",mart=ensembl_mart)
+biomart_human_filters <- listFilters(ens_dataset)
+kable(biomart_human_filters[
+  grep(biomart_human_filters$name,pattern="ensembl"),],
+      format="html")
+
+```
+
+Hgnc is the nomemclature committee for hugo so search for that. 
+```{r}
+kable(searchAttributes(mart = ens_dataset, 'ensembl|hgnc')[1:12,] , 
+      format="html") 
+```
+
+```{r}
+conversion_stash <- "geneEx_conversion.rds"
+if(file.exists(conversion_stash)){
+  geneEx_conversion <- readRDS(conversion_stash)
+} else {
+  geneEx_conversion <- getBM(attributes = c("ensembl_gene_id","hgnc_symbol"),
+                            filters = c("ensembl_gene_id"),
+                            values = rownames(counts_filtered),
+                            mart = ens_dataset)
+  saveRDS(geneEx_conversion, conversion_stash)
+}
+nrow(counts_filtered) - nrow(geneEx_conversion)
+
+```
