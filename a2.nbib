@@ -1,0 +1,91 @@
+PMID- 32750113
+OWN - NLM
+STAT- In-Data-Review
+LR  - 20210314
+IS  - 1528-0020 (Electronic)
+IS  - 0006-4971 (Print)
+IS  - 0006-4971 (Linking)
+VI  - 136
+IP  - 24
+DP  - 2020 Dec 10
+TI  - Comprehensive analyses of B-cell compartments across the human body reveal novel 
+      subsets and a gut-resident memory phenotype.
+PG  - 2774-2785
+LID - 10.1182/blood.2019002782 [doi]
+AB  - Although human B cells have been extensively studied, most reports have used 
+      peripheral blood as a source. Here, we used a unique tissue resource derived from 
+      healthy organ donors to deeply characterize human B-cell compartments across 
+      multiple tissues and donors. These datasets revealed that B cells in the blood are 
+      not in homeostasis with compartments in other tissues. We found striking 
+      donor-to-donor variability in the frequencies and isotype of CD27+ memory B cells 
+      (MBCs). A comprehensive antibody-based screen revealed markers of MBC and allowed 
+      identification of novel MBC subsets with distinct functions defined according to 
+      surface expression of CD69 and CD45RB. We defined a tissue-resident MBC phenotype 
+      that was predominant in the gut but absent in blood. RNA-sequencing of MBC subsets 
+      from multiple tissues revealed a tissue-resident MBC gene signature as well as gut- 
+      and spleen-specific signatures. Overall, these studies provide novel insights into 
+      the nature and function of human B-cell compartments across multiple tissues.
+CI  - © 2020 by The American Society of Hematology.
+FAU - Weisel, Nadine M
+AU  - Weisel NM
+AD  - Department of Immunology, University of Pittsburgh School of Medicine, Pittsburgh, 
+      PA.
+FAU - Weisel, Florian J
+AU  - Weisel FJ
+AD  - Department of Immunology, University of Pittsburgh School of Medicine, Pittsburgh, 
+      PA.
+FAU - Farber, Donna L
+AU  - Farber DL
+AD  - Columbia Center for Translational Immunology.
+AD  - Department of Microbiology and Immunology.
+AD  - Department of Surgery, and.
+FAU - Borghesi, Lisa A
+AU  - Borghesi LA
+AD  - Department of Immunology, University of Pittsburgh School of Medicine, Pittsburgh, 
+      PA.
+FAU - Shen, Yufeng
+AU  - Shen Y
+AD  - Department of Systems Biology, Columbia University Medical Center, New York, NY; 
+      and.
+FAU - Ma, Wenji
+AU  - Ma W
+AD  - Department of Systems Biology, Columbia University Medical Center, New York, NY; 
+      and.
+FAU - Luning Prak, Eline T
+AU  - Luning Prak ET
+AD  - Department of Pathology and Laboratory Medicine, University of Pennsylvania School 
+      of Medicine, Philadelphia, PA.
+FAU - Shlomchik, Mark J
+AU  - Shlomchik MJ
+AD  - Department of Immunology, University of Pittsburgh School of Medicine, Pittsburgh, 
+      PA.
+LA  - eng
+GR  - R21 AI142744/AI/NIAID NIH HHS/United States
+GR  - R21 AI126440/AI/NIAID NIH HHS/United States
+GR  - P01 AI106697/AI/NIAID NIH HHS/United States
+GR  - R01 AI043603/AI/NIAID NIH HHS/United States
+GR  - R01 AI145064/AI/NIAID NIH HHS/United States
+PT  - Journal Article
+TA  - Blood
+JT  - Blood
+JID - 7603509
+SB  - AIM
+SB  - IM
+PMC - PMC7731793
+COIS- Conflict-of-interest disclosure: The authors declare no competing financial 
+      interests.
+EDAT- 2020/08/05 06:00
+MHDA- 2020/08/05 06:00
+PMCR- 2021/12/10
+CRDT- 2020/08/05 06:00
+PHST- 2019/08/30 00:00 [received]
+PHST- 2020/06/22 00:00 [accepted]
+PHST- 2021/12/10 00:00 [pmc-release]
+PHST- 2020/08/05 06:00 [pubmed]
+PHST- 2020/08/05 06:00 [medline]
+PHST- 2020/08/05 06:00 [entrez]
+AID - S0006-4971(20)72811-9 [pii]
+AID - 2020/BLD2019002782 [pii]
+AID - 10.1182/blood.2019002782 [doi]
+PST - ppublish
+SO  - Blood. 2020 Dec 10;136(24):2774-2785. doi: 10.1182/blood.2019002782.
