@@ -5,8 +5,7 @@ date: "20/03/2021"
 output: 
   html_notebook:
     toc: true
-    toc_depth: 2
-bibliography: a2.nbib
+    toc_depth: 3
 
 ---
 
@@ -16,11 +15,23 @@ Install required packages
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 # BiocManager::install("TCGAbiolinks")
+
+library(knitr)
+library(ComplexHeatmap)
+library(circlize)
+library(limma)
+library(Biobase)
+library(tidyr)
+library(dplyr)
+library("edgeR")
+library(kableExtra)
+
 ```
 # Introduction:
 The dataset I have chosen to work for the assignment is titled Comprehensive analyses of B cell compartments across the human body reveal novel subsets and a gut resident memory phenotype. It can be found at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE154583. This dataset  analyizes  B lineage cells in various tissues of multiple healthy organ donors which reveal tissue-specific differences and lack of correspondence between blood and tissues. New, functionally distinct memory B cell subsets were discovered, including one subset specific to the gut that has unique surface markers and a unique gene expression signature.
  	
-Overall design:	RNA profiling of memory B cell subsets defined by CD45RB and CD69 expression in spleen. There were 4 biological replicates. I will be analysing the samples to find differences between naive B cell and MBC (memory B cell) across the 4 donors. 
+## Overall design:	
+RNA profiling of memory B cell subsets defined by CD45RB and CD69 expression in spleen. There were 4 biological replicates. I will be analysing the samples to find differences between naive B cell and MBC (memory B cell) across the 4 donors. 
 
 The table below depicts the data set. The sample names legend is as follows:
 D = donor
@@ -28,12 +39,11 @@ A/B/C/D = the donor name
 N = Naive cell type
 M = MBC
 [1-9] = sample number for that cell type from that donor
-
 Example: D.D.N.1 is the first sample from donor d of naive b cell type.
 ```{r}
 library(knitr)
 
-normalized_count_data <- read.table(file=file.path(getwd(),"ncmatrix.txt"),
+normalized_count_data <- read.table(file=file.path(getwd(),"data", "ncmatrix.txt"),
                                     header = TRUE,sep = " ",
                                     stringsAsFactors = FALSE,
                                     check.names=FALSE)
@@ -74,6 +84,7 @@ current_heatmap <- Heatmap(as.matrix(heatmap_matrix),
 
 ```
 
+## Heatmap 
 ```{r}
 
 current_heatmap
@@ -88,6 +99,8 @@ gene_of_interest <- which(
   rownames(normalized_count_data) == "CD69")
 gene_of_interest
 ```
+
+# Model Design
 Let's take a look at the counts for CD69 in naive and MBC samples that we created above. Notice that there is a lot of variability in the data when we compare samples from different donors.
 
 ```{r}
@@ -127,7 +140,7 @@ rownames(samples) <- c("donors","cell_type")
 samples <- data.frame(t(samples))
 samples[4:10,]
 ```
-# Simple model Limma
+#E Simple model Limma
 First let's design a simple model to work on. The simple model only performs analysis on cell type and doesn't look at differences in donors. 
 ```{r}
 model_design <- model.matrix(~ samples$cell_type )
@@ -171,7 +184,9 @@ library(tidyr)
 library(dplyr)
 names(output_hits)[names(output_hits) == "x"] <- "hgnc_symbol"
 kable(output_hits[1:10,1:7],type="html",row.names = FALSE)
+
 ```
+-Calculate p-values for each of the genes in your expression set. How many genes were significantly differentially expressed? What thresholds did you use and why?
 
 The number of genes which pass the threshold p-value in our top hits:I'm choosing the standard value 0.05 for the threshold. A lot of genes pass the threshold as well as correction so in some of the differentials ahead, i'll choose a lower threshold.
 ```{r}
@@ -182,7 +197,7 @@ length(which(output_hits$adj.P.Val < 0.05))
 
 ```
 
-# Donor model Limma
+## Donor model Limma
 
 Now let's correct our model to account for donor variability in our samples. I'll create a new model for this and create a fit similar to what I did in the simple model. the table below shows how the new model is defined and what variables we're considering. I predict that the new model will show us more accurate results, eliminating chance in our analysis. 
 ```{r}
@@ -191,6 +206,8 @@ model_design_d1 <- model.matrix(
 kable(model_design_d1[1:5,1:5],type="html")
 
 ```
+- Multiple hypothesis testing - correct your p-values using a multiple hypothesis correction method. Which method did you use? And Why? How many genes passed correction?
+
 Adding to my new model, I will be using the fit we got for our model design after emprical bayes. To support multiple hypothesis testing, again,  I'll be using the Benjamni - hochberg method to adjust the p values. The table below shows the top hits in our normalised counts, ordered according to P value. We're only using top hits in the model for now, we'll consider the lower hits while doing enrichment analysis.
 ```{r}
 
@@ -222,7 +239,7 @@ length(which(output_hits_d1$adj.P.Val < 0.05))
 
 ```
 
-# Comparing simple and donor models
+## Comparing simple and donor models
 The graph below compares the P values of different genes in both the models i.e. from when we only accounted for cell variablity vs when we added the donors. This might help us conduct a more accurate analysis and eliminate counts by chance.
 ```{r}
 simple_model_pvalues <- data.frame(gene_id =
@@ -253,6 +270,7 @@ legend(0,1,legend=c("simple","donor", "both", "rest"),
        fill=c("orange","blue", "red", "black"),cex = 0.7)
 ```
 
+## Simple Vs Donor Model
 The graph below compares the  normalized counts for gene CD69 amongst different genes in both the models i.e. from when we only accounted for cell variablity vs when we added the donors. 
 
 ```{r}
@@ -305,9 +323,10 @@ current_heatmap
 # Analysis with edgeR
 Up until now I've been using limma for analysis but since the data expression type is bulk RNA seq, it'll be better to try and use edgeR. Let's use our donor model and make a heatmap according to the quasilikelihood method. The DGElist estimates dispersion and we can make a fit for the model like we did with Limma and ebayes. I've taken 13 as the threshold for count per millions following the edgeR protocol. 
 
+## Filter counts
 ```{r}
 library("edgeR")
-mc <- read.table(file=file.path(getwd(),"counts.txt"),
+mc <- read.table(file=file.path(getwd(),"data","counts.txt"),
                                     header = TRUE,sep = " ",
                                     stringsAsFactors = FALSE,
                                     check.names=FALSE)
@@ -334,6 +353,7 @@ kable(model_design_d1[1:10,1:5], type="html") %>% row_spec(0, angle=45)
 
 ```
 
+## Quasi-Likeli Method
 Calculate the differential expression for the Quasi-likelihood method. I'm using cell type as the coefficient here from the intercept matrix above. The table below depicts the qlf model. 
 
 ```{r}
@@ -352,7 +372,7 @@ length(which(qlf_output_hits$table$FDR < 0.05))
 
 ```
 
-# Comparing Limma and edgeR results
+## Comparing Limma and edgeR results
 The graph below compares our differential results (genes which passed the threshold as well as correction) from limma and edgeR. 
 ```{r}
 qlf_d_model_pvalues <- data.frame(
@@ -382,6 +402,7 @@ legend(0,1,legend=c("QLF","Limma", "both", "rest"),
 
 ```
 
+-Show the amount of differentially expressed genes using an MA Plot or a Volcano plot. Highlight genes of interest.
 Similar to the limma method let's look at CD69 variations 
 ```{r}
 cd69_gene <- rownames(normalized_count_data)[
@@ -430,12 +451,19 @@ current_heatmap <- Heatmap(as.matrix(heatmap_matrix_tophits),
                                show_row_names = FALSE,
                                show_heatmap_legend = TRUE, )
 ```
+
+- Visualize your top hits using a heatmap. Do you conditions cluster together? Explain why or why or not.
 ```{r}
 current_heatmap
 ```
 This appears to be a much more refined heatmap than what we started with, I have formatedd the columns to be able to compare between cell types.
 
 
+
+
+# ORA
+
+## Thresholded lists
 Number of Up regulated vs number of downregulated genes:
 ```{r}
 # up regulated
@@ -447,29 +475,180 @@ length(which(qlf_output_hits$table$PValue < 0.05
 
 ```
 
-
+## Prepare qlf output list
 Let's create a thresholded list of genes. Since we'll be needing up-regulated and down-regulated files during enrichment analysis, we'll store the tables to files
 ```{r}
 
-qlf_output_hits_withgn <- merge(counts_filtered[,1],qlf_output_hits, by.x=1, by.y=0)
+qlf_output_hits_withgn <- as.data.frame(qlf_output_hits)
 
 qlf_output_hits_withgn[,"rank"] <- -log(qlf_output_hits_withgn$PValue, base = 10)*sign(qlf_output_hits_withgn$logFC)
 qlf_output_hits_withgn <- qlf_output_hits_withgn[order(qlf_output_hits_withgn$rank),]
-upregulated_genes <- qlf_output_hits_withgn$gname[
+upregulated_genes <- rownames(qlf_output_hits_withgn)[
   which(qlf_output_hits_withgn$PValue < 0.05 
              & qlf_output_hits_withgn$logFC > 0)]
-downregulated_genes <- qlf_output_hits_withgn$gname[
+downregulated_genes <- rownames(qlf_output_hits_withgn)[
   which(qlf_output_hits_withgn$PValue < 0.05 
              & qlf_output_hits_withgn$logFC < 0)]
 write.table(x=upregulated_genes,
-            file=file.path("upregulated_genes.txt"),sep = " ",
+            file=file.path("./data/upregulated_genes.txt"),sep = " ",
             row.names = FALSE,col.names = FALSE,quote = FALSE)
 write.table(x=downregulated_genes,
-            file=file.path("downregulated_genes.txt"),sep = " ",
+            file=file.path("./data/downregulated_genes.txt"),sep = " ",
             row.names = FALSE,col.names = FALSE,quote = FALSE)
-write.table(x=data.frame(genename= qlf_output_hits_withgn$gname,F_stat=qlf_output_hits_withgn$rank),
-            file=file.path("ranked_genelist.txt"),sep = " ",
+write.table(x=data.frame(genename= rownames(qlf_output_hits_withgn),F_stat=qlf_output_hits_withgn$rank),
+            file=file.path("./data/ranked_genelist.txt"),sep = " ",
             row.names = FALSE,col.names = FALSE,quote = FALSE)
 
 ```
+
+I used g:profiler web for over representation analysis. 
+The three lists we created above: upregulated_genes, downregulated_genes and ranked_genelist were profiled through in the enrichment analysis. 
+
+I used the Benjamini-Hochberg FDR method for enrichment analysis and chose the threshold as 0.01.
+
+The following data sources were used: 
+GO biological process
+No electronic GO annotations 
+Reactome
+WikiPathways
+
+
+## ORA results:
+
+The threshold balue is 0.01 with a max term size of 10000.  
+
+###Upregulated Genes:
+ Go Annotation Results:
+![Fig 1a Go Annotations - upregulated genes](img/upgo.png)
+
+
+Reactome Annotation Results:
+![Fig 1b Reactome annotations - upregulated genes](img/upreac.png)
+
+
+ Wiki Pathways Annotation Results:
+![Fig 1c Wiki Pathways annotations - upregulated genes](img/upwiki.png)
+
+
+### Down Regulated Genes
+ Go Annotation Results:
+![Fig 1d Go Annotations - downregulated genes](img/downgo.png)
+
+
+Reactome Annotation Results:
+![Fig 1e Reactome annotations - downregulated genes](img/downreac.png)
+
+
+ Wiki Pathways Annotation Results:
+![Fig 1f Wiki Pathways annotations - downregulated genes](img/downwiki.png)
+
+
+### Genes List:
+ Go Annotation Results:
+![Fig 1g Go Annotations - gene rank list](img/rankgo.png)
+
+
+Reactome Annotation Results:
+![Fig 1h Reactome Annotations - gene rank list](img/rankreac.png)
+
+
+ Wiki Pathways Annotation Results:
+![Fig 1i Wiki Pathways Annotations - gene rank list](img/rankwiki.png)
+
+## Q&A
+
+- Which method did you choose and why?
+
+I chose to use G: profiler to work with thresholded lists
+
+- What annotation data did you use and why? What version of the annotation are you using?
+
+ GO:BP – annotations: BioMart classes: releases/2020-12-08
+ 
+REAC – annotations: BioMart
+classes: 2020-12-15
+ 
+WP – 20201210
+
+- How many genesets were returned with what thresholds?
+
+The threshold balue is 0.01 with a max term size of 10000.  
+
+Upregulted genes:
+
+Go results: 99 genesets.
+
+Reactome results: 27genesets 
+
+Wikipathways results: 6 genesets 
+
+Downregulted genes:
+
+Go results: 143 genesets 
+
+Reactome results: 50 genesets 
+
+Wikipathways results: 4 genesets 
+
+
+
+Go results: 1209 genesets
+
+Reactome results: 529  genesets 
+
+Wikipathways results: 154 genesets 
+
+- Run the analysis using the up-regulated set of genes, and the down-regulated set of genes separately. How do these results compare to using the whole list (i.e all differentially expressed genes together vs. the up-regulated and down regulated differentially expressed genes separately)?
+
+The results of all three analysis can be seen below
+
+Up regulated Enrichment graph:
+![Fig 1j Up regulated Enrichment graph](img/upgraph.png)
+
+
+Downregulated list Enrichment graph:
+![Fig 1k Downregulated list Enrichment graph](img/downgraph.png)
+
+
+ Rank list Enrichment graph:
+![Fig 1l Rank list Enrichment graph](img/rankgraph.png)
+
+
+# References
+
+## DataSet Paper
+Weisel, N. M., Weisel, F. J., Farber, D. L., Borghesi, L. A., Shen, Y., Ma, W., Luning Prak, E. T., & Shlomchik, M. J. (2020). Comprehensive analyses of B-cell compartments across the human body reveal novel subsets and a gut-resident memory phenotype. Blood, 136(24), 2774–2785. https://doi.org/10.1182/blood.2019002782
+
+## Packages
+
+Yihui Xie (2014) knitr: A Comprehensive Tool for Reproducible Research in R. In
+  Victoria Stodden, Friedrich Leisch and Roger D. Peng, editors, Implementing
+  Reproducible Computational Research. Chapman and Hall/CRC. ISBN 978-1466561595
+citation("ComplexHeatmap")
+
+ Gu, Z. (2014) circlize implements and enhances circular visualization in R.
+  Bioinformatics.
+
+
+Ritchie, M.E., Phipson, B., Wu, D., Hu, Y., Law, C.W., Shi, W., and Smyth, G.K.
+  (2015). limma powers differential expression analyses for RNA-sequencing and
+  microarray studies. Nucleic Acids Research 43(7), e47.
+
+strating high-throughput genomic analysis with Bioconductor. W. Huber,
+  V.J. Carey, R. Gentleman, ..., M. Morgan Nature Methods, 2015:12, 115.
+
+Hadley Wickham (2020). tidyr: Tidy Messy Data. R package version 1.1.2.
+  https://CRAN.R-project.org/package=tidyr
+
+Hadley Wickham, Romain François, Lionel Henry and Kirill Müller (2020). dplyr:
+  A Grammar of Data Manipulation. R package version 1.0.2.
+  https://CRAN.R-project.org/package=dplyr
+
+Robinson MD, McCarthy DJ and Smyth GK (2010). edgeR: a Bioconductor package for
+  differential expression analysis of digital gene expression data.
+  Bioinformatics 26, 139-140
+
+  Hao Zhu (2019). kableExtra: Construct Complex Table with 'kable' and Pipe
+  Syntax. http://haozhu233.github.io/kableExtra/,
+  https://github.com/haozhu233/kableExtra.
 
