@@ -472,34 +472,62 @@ length(which(qlf_output_hits$table$PValue < 0.05
 # down regulated
 length(which(qlf_output_hits$table$PValue < 0.05 
              & qlf_output_hits$table$logFC < 0))
+qlf_output_hits
+```
+```{r}
+qlf_output_hits_withgn = as.data.frame(qlf_output_hits)
+qlf_output_hits_withgn <- data.frame(names = row.names(qlf_output_hits_withgn), qlf_output_hits_withgn)
+rownames(qlf_output_hits_withgn ) <- c()
+qlf_output_hits_withgn <-qlf_output_hits_withgn[order(qlf_output_hits_withgn$PValue),]
+# add rank column
+qlf_output_hits_withgn[,"rank"] <- -log(qlf_output_hits_withgn$PValue, base = 10) * sign(qlf_output_hits_withgn$logFC)
+qlf_output_hits_withgn <- qlf_output_hits_withgn[order(qlf_output_hits_withgn$rank, decreasing = TRUE),]
 
+upregulated_genes <- rownames(qlf_output_hits_withgn)[   
+  which(qlf_output_hits_withgn$PValue < 0.05      
+        & qlf_output_hits_withgn$logFC > 0)] 
+
+downregulated_genes <- rownames(qlf_output_hits_withgn)[  
+  which(qlf_output_hits_withgn$PValue < 0.05             
+        & qlf_output_hits_withgn$logFC < 0)]
+write.table(x=upregulated_genes,          
+            file=file.path("./","upregulated_genes.txt"),sep ="\t",
+            row.names = FALSE,col.names = FALSE,quote = FALSE)
+write.table(x=downregulated_genes,          
+            file=file.path("./","downregulated_genes.txt"),sep ="\t",
+            row.names = FALSE,col.names = FALSE,quote = FALSE)
+# Need to filter empty values for GSEA to work.
+
+qlf_output_hits_withgn_Filtered <- qlf_output_hits_withgn[!(!is.na(rownames(qlf_output_hits_withgn)) & rownames(qlf_output_hits_withgn)==""), ] 
+write.table(x=data.frame(genename= qlf_output_hits_withgn_Filtered$names, F_stat = qlf_output_hits_withgn_Filtered$rank),   
+            file=file.path("./","ranked_genelist_filtered.rnk"),sep ="\t",
+            row.names = FALSE,col.names = TRUE,quote = FALSE)
+qlf_output_hits_withgn_Filtered[1:5, 1:7]
 ```
 
-## Prepare qlf output list
-Let's create a thresholded list of genes. Since we'll be needing up-regulated and down-regulated files during enrichment analysis, we'll store the tables to files
+
 ```{r}
 
-qlf_output_hits_withgn <- as.data.frame(qlf_output_hits)
-
-qlf_output_hits_withgn[,"rank"] <- -log(qlf_output_hits_withgn$PValue, base = 10)*sign(qlf_output_hits_withgn$logFC)
-qlf_output_hits_withgn <- qlf_output_hits_withgn[order(qlf_output_hits_withgn$rank),]
-upregulated_genes <- rownames(qlf_output_hits_withgn)[
-  which(qlf_output_hits_withgn$PValue < 0.05 
-             & qlf_output_hits_withgn$logFC > 0)]
-downregulated_genes <- rownames(qlf_output_hits_withgn)[
-  which(qlf_output_hits_withgn$PValue < 0.05 
-             & qlf_output_hits_withgn$logFC < 0)]
-write.table(x=upregulated_genes,
-            file=file.path("./data/upregulated_genes.txt"),sep = " ",
-            row.names = FALSE,col.names = FALSE,quote = FALSE)
-write.table(x=downregulated_genes,
-            file=file.path("./data/downregulated_genes.txt"),sep = " ",
-            row.names = FALSE,col.names = FALSE,quote = FALSE)
-write.table(x=data.frame(genename= rownames(qlf_output_hits_withgn),F_stat=qlf_output_hits_withgn$rank),
-            file=file.path("./data/ranked_genelist.txt"),sep = " ",
-            row.names = FALSE,col.names = FALSE,quote = FALSE)
-
 ```
+
+
+```{r}
+
+#colnames(qlf_output_hits_withgn)[2] <- "rank"
+
+# P.S gaps exist in the file where there are no hgnc_symbols (NA) because they were not mapped.
+
+
+# Filter 372 rows out
+qlf_output_hits_withgn_Filtered <- qlf_output_hits_withgn[!(!is.na(rownames(qlf_output_hits_withgn)) & rownames(qlf_output_hits_withgn)==""), ] 
+write.table(x=data.frame(genename= rownames(qlf_output_hits_withgn_Filtered), F_stat=qlf_output_hits_withgn_Filtered$rank),   
+            file=file.path("./","ranked_genelist_filtered.txt"),sep ="\t",
+            row.names = FALSE,col.names = TRUE,quote = FALSE)
+```
+```
+## Prepare qlf output list
+Let's create a thresholded list of genes. Since we'll be needing up-regulated and down-regulated files during enrichment analysis, we'll store the tables to files
+
 
 I used g:profiler web for over representation analysis. 
 The three lists we created above: upregulated_genes, downregulated_genes and ranked_genelist were profiled through in the enrichment analysis. 
